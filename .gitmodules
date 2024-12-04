@@ -10,3 +10,6 @@
 [submodule "croco"]
 	path = submodules/croco
 	url = https://github.com/naver/croco
+[submodule "submodules/sam2"]
+	path = submodules/sam2
+	url = https://github.com/facebookresearch/sam2
