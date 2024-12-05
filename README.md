@@ -20,7 +20,7 @@ wget https://download.europe.naverlabs.com/ComputerVision/DUSt3R/DUSt3R_ViTLarge
 wget https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_large.pt -P checkpoints/
 ```
 
-2. Create the environment ( conda).
+2. Create the environment.
 ```bash
 conda create -n dronesplat python=3.11
 conda activate dronesplat
