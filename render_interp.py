@@ -47,41 +47,35 @@ def kochanek_bartels_interpolation(keyframes, num_frames, tension=0.0, bias=0.0,
 
 
 def interpolate_camera_list(camera_list, n_frames, tension=0.0, bias=0.0, continuity=0.0):
-    # Step 1: Extract keyframes (positions and orientations)
 
     keyframes = []
     for camera in camera_list:
         position = camera.T
-        rotation = R.from_matrix(camera.R).as_quat()  # Convert rotation matrix to quaternion
+        rotation = R.from_matrix(camera.R).as_quat()  
         keyframes.append((position, rotation))
 
     print("len(key_frames):", len(keyframes))
-    # Step 2: Perform Kochanek-Bartels interpolation
     interpolated_positions, interpolated_orientations = kochanek_bartels_interpolation(keyframes, n_frames, tension, bias, continuity)
 
     FoVx = camera_list[0].FoVx
     FoVy = camera_list[0].FoVy
-    # Step 3: Generate new Camera objects with interpolated poses
     new_camera_list = []
     for i in range(n_frames):
         pos = interpolated_positions[i]
-        quat = interpolated_orientations[i]
-        
-        # Convert quaternion back to rotation matrix
+        quat = interpolated_orientations[i]     
+
         R_matrix = R.from_quat(quat).as_matrix()
 
-        # Get the original camera parameters for other properties (FOV, image, etc.)
-        original_camera = camera_list[i % len(camera_list)]  # Reuse some parameters from original cameras
+        original_camera = camera_list[i % len(camera_list)] 
 
-        # Create a new Camera object with interpolated pose
         new_camera = Camera(
             colmap_id=original_camera.colmap_id,
             R=R_matrix,
             T=pos,
             FoVx=FoVx,
             FoVy=FoVy,
-            image=original_camera.original_image,  # Assuming you want to keep the same image for all frames
-            gt_alpha_mask=original_camera.original_image * 0,  # You can change this if you need new masks
+            image=original_camera.original_image, 
+            gt_alpha_mask=original_camera.original_image * 0, 
             image_name=original_camera.image_name,
             uid=original_camera.uid,
             trans=original_camera.trans,
@@ -155,7 +149,7 @@ def render_sets(
     )
 
     image_folder = os.path.join(dataset.model_path, f'interps/ours_{args.iteration}/renders')
-    output_video_file = os.path.join(dataset.model_path, f'{args.scene}_{args.n_views}_view.mp4')
+    output_video_file = os.path.join(dataset.model_path, f'interps.mp4')
     images_to_video(image_folder, output_video_file, fps=30)
 
 
@@ -167,8 +161,6 @@ if __name__ == "__main__":
     parser.add_argument("--iteration", default=-1, type=int)
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--get_video", action="store_true")
-    parser.add_argument("--n_views", default=None, type=int)
-    parser.add_argument("--scene", default=None, type=str)
     args = get_combined_args(parser)
     print("Rendering " + args.model_path)
 

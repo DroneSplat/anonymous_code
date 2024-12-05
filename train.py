@@ -413,7 +413,6 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
             tb_writer.add_scalar('total_points', scene.gaussians.get_xyz.shape[0], iteration)
         torch.cuda.empty_cache()
 
-
 if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Training script parameters")
@@ -430,7 +429,6 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)
     parser.add_argument("--scene", type=str, default=None)
-    parser.add_argument("--n_views", type=int, default=None)
     parser.add_argument("--get_video", action="store_true")
     parser.add_argument("--preset_instance_threshold", type=float, default=0.4)
     parser.add_argument("--threshold_local", type=float, default=0.4)
