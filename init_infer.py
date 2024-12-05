@@ -6,11 +6,11 @@ import time
 import matplotlib.pyplot as plt
 from plyfile import PlyData, PlyElement
 
-from submodules.dust3r.inference import inference
-from submodules.dust3r.model import AsymmetricCroCo3DStereo
-from submodules.dust3r.utils.device import to_numpy
-from submodules.dust3r.image_pairs import make_pairs
-from submodules.dust3r.cloud_opt import global_aligner, GlobalAlignerMode
+from submodules.dust3r.dust3r.inference import inference
+from submodules.dust3r.dust3r.model import AsymmetricCroCo3DStereo
+from submodules.dust3r.dust3r.utils.device import to_numpy
+from submodules.dust3r.dust3r.image_pairs import make_pairs
+from submodules.dust3r.dust3r.cloud_opt import global_aligner, GlobalAlignerMode
 from utils.dust3r_utils import  compute_global_alignment, load_images,  save_colmap_cameras, save_colmap_images
 
 from scene.colmap_loader import read_extrinsics_binary, read_intrinsics_binary
