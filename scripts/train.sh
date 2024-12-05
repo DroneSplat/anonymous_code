@@ -26,11 +26,11 @@ for DATASET in "${DATASETS[@]}"; do
 
         CMD_P="CUDA_VISIBLE_DEVICES=${GPU_ID} python preprocess.py \
         --img_base_path ${SOURCE_PATH} \
-        --preset_colmap_path ${COLMAP_PATH} \
+        --colmap_path ${COLMAP_PATH} \
         --preset_pose
         "
 
-        CMD_T="CUDA_VISIBLE_DEVICES=${GPU_ID} proxychains python -W ignore ./train_joint_v8.py \
+        CMD_T="CUDA_VISIBLE_DEVICES=${GPU_ID} python train_joint_v8.py \
         -s ${SOURCE_PATH} \
         -m ${MODEL_PATH}  \
         --scene ${SCENE} \
@@ -40,7 +40,7 @@ for DATASET in "${DATASETS[@]}"; do
         --use_hooks
         "
 
-        CMD_RI="CUDA_VISIBLE_DEVICES=${GPU_ID} python render_interp.py \
+        CMD_R="CUDA_VISIBLE_DEVICES=${GPU_ID} python render_interp.py \
         -s ${SOURCE_PATH} \
         -m ${MODEL_PATH}  \
         --iter ${gs_train_iter} \

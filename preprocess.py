@@ -26,7 +26,7 @@ def get_args_parser():
     parser.add_argument("--niter", type=int, default=500)
     parser.add_argument("--focal_avg", action="store_true")
     parser.add_argument("--img_base_path", type=str, default="data/uni3_512_confidence/32_views")
-    parser.add_argument("--preset_colmap_path", type=str, default="uni3_512_colmap/32_views/sparse/0")
+    parser.add_argument("--colmap_path", type=str, default="uni3_512_colmap/32_views/sparse/0")
     parser.add_argument("--min_threshold", type=float, default=1.0)
     parser.add_argument("--preset_pose", action="store_true", help="Use preset pose if provided")
     return parser

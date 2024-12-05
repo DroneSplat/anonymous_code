@@ -29,6 +29,17 @@ def render_sets(
         bg_color = [1, 1, 1] if dataset.white_background else [0, 0, 0]
         bg = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
 
+        viewpoint_stack = scene.getTrainCameras().copy()
+        save_dir = os.path.join(scene.model_path, "render_train")
+        makedirs(save_dir, exist_ok=True)
+        for i, viewpoint_cam in tqdm(enumerate(viewpoint_stack)):
+            pose = gaussians.get_RT(viewpoint_cam.uid)
+            render_pkg = render(viewpoint_cam, gaussians, pipe, bg, camera_pose=pose)
+            image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
+            image_name = viewpoint_cam.image_name + ".jpg"
+            save_path = os.path.join(save_dir, image_name)
+            torchvision.utils.save_image(image, save_path)
+
         viewpoint_stack = scene.getTestCameras().copy()
         save_dir = os.path.join(scene.model_path, "render_test")
         makedirs(save_dir, exist_ok=True)
@@ -48,7 +59,6 @@ if __name__ == "__main__":
 
     model = ModelParams(parser, sentinel=True)
 
-    parser.add_argument("--get_video", action="store_true")
     parser.add_argument("--iteration", default=-1, type=int)
     args = get_combined_args(parser)
     print("Rendering " + args.model_path)

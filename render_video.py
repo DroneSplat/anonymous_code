@@ -136,7 +136,7 @@ def render_sets(
         bg_color = [1, 1, 1] if dataset.white_background else [0, 0, 0]
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
 
-        render_cameras = interpolate_camera_list(scene.getTestCameras(), 575)
+        render_cameras = interpolate_camera_list(scene.getTestCameras(), args.n_views)
     # render interpolated views
     render_set(
         dataset.model_path,
@@ -150,7 +150,7 @@ def render_sets(
 
     image_folder = os.path.join(dataset.model_path, f'interps/ours_{args.iteration}/renders')
     output_video_file = os.path.join(dataset.model_path, f'interps.mp4')
-    images_to_video(image_folder, output_video_file, fps=30)
+    images_to_video(image_folder, output_video_file, fps=args.fps)
 
 
 if __name__ == "__main__":
@@ -161,6 +161,8 @@ if __name__ == "__main__":
     parser.add_argument("--iteration", default=-1, type=int)
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--get_video", action="store_true")
+    parser.add_argument("--n_views", default=600, type=int)
+    parser.add_argument("--fps", default=30, type=int)
     args = get_combined_args(parser)
     print("Rendering " + args.model_path)
 
