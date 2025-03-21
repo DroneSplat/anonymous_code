@@ -155,7 +155,6 @@ def storePly(path, xyz, rgb):
 
 
 def readColmapSceneInfo(path, images, eval, args, opt):
-    # 读取相机外参和内参
     try:
         cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")
         cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.bin")
@@ -167,7 +166,6 @@ def readColmapSceneInfo(path, images, eval, args, opt):
         cam_extrinsics = read_extrinsics_text(cameras_extrinsic_file)
         cam_intrinsics = read_intrinsics_text(cameras_intrinsic_file)
 
-    # 读取训练和测试图像列表
     train_list_file = os.path.join(path, "train_list.txt")
     test_list_file = os.path.join(path, "test_list.txt")
 
@@ -183,7 +181,6 @@ def readColmapSceneInfo(path, images, eval, args, opt):
 
     cam_infos_unsorted, poses = readColmapCameras(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics, images_folder=os.path.join(path, reading_dir), eval=eval)
 
-    # 排序相机信息
     sorting_indices = sorted(range(len(cam_infos_unsorted)), key=lambda x: cam_infos_unsorted[x].image_name)
     cam_infos = [cam_infos_unsorted[i] for i in sorting_indices]
     sorted_poses = [poses[i] for i in sorting_indices]
@@ -194,20 +191,13 @@ def readColmapSceneInfo(path, images, eval, args, opt):
         train_poses = sorted_poses
         test_poses = sorted_poses
     else:
-    # 根据train_list和test_list区分训练集和测试集相机
         train_cam_infos = [cam for cam in cam_infos if cam.image_name in train_list]
         test_cam_infos = [cam for cam in cam_infos if cam.image_name in test_list]
         train_poses = [pose for cam, pose in zip(cam_infos, sorted_poses) if cam.image_name in train_list]
         test_poses = [pose for cam, pose in zip(cam_infos, sorted_poses) if cam.image_name in test_list]
 
-    # print("train_poses: ", train_poses)
-    # print("test_poses: ", test_poses)
-    # print("train_cam_infos: ", train_cam_infos)
-
-    # 计算NeRF归一化参数
     nerf_normalization = getNerfppNorm(train_cam_infos)
 
-    # 读取点云数据
     ply_path = os.path.join(path, "sparse/0/points3D.ply")
     bin_path = os.path.join(path, "sparse/0/points3D.bin")
     txt_path = os.path.join(path, "sparse/0/points3D.txt")
@@ -223,7 +213,6 @@ def readColmapSceneInfo(path, images, eval, args, opt):
     except:
         pcd = None
 
-    # 返回场景信息
     scene_info = SceneInfo(point_cloud=pcd,
                            train_cameras=train_cam_infos,
                            test_cameras=test_cam_infos,

@@ -21,7 +21,7 @@ try:
     TENSORBOARD_FOUND = True
 except ImportError:
     TENSORBOARD_FOUND = False
-from submodules.sam2.sam2.build_sam import build_sam2_video_predictor
+
 
 
 def load_mask(mask_path):
@@ -111,21 +111,6 @@ def normalize_to_01(tensor):
     tensor_max = tensor.max()
     return (tensor - tensor_min) / (tensor_max - tensor_min)
 
-def get_points_from_heatmap(heatmap_norm, iteration, preset_video_seg_threshold):
-    mean_value = heatmap_norm.mean()
-    std_value = heatmap_norm.std()
-    video_seg_threshold = mean_value + args.threshold_global * std_value * (args.iterations - iteration) / args.iterations
-    mask = heatmap_norm > video_seg_threshold
-    mask = mask.detach().cpu().numpy()
-    labeled_array, num_features = label(mask)
-    
-    video_seg_points = []
-    for i in range(1, num_features + 1):
-        center = center_of_mass(mask, labeled_array, i)
-        video_seg_points.append((int(center[1]), int(center[0])))
-    
-    return video_seg_points
-
 def prepare_output_and_logger(args):    
     if not args.model_path:
         if os.getenv('OAR_JOB_ID'):
@@ -151,7 +136,7 @@ def prepare_output_and_logger(args):
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from, args):
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
-    gaussians = GaussianModel(dataset.sh_degree, args.use_hooks)
+    gaussians = GaussianModel(dataset.sh_degree)
     scene = Scene(dataset, gaussians, opt=args, shuffle=True)                                                                      
     gaussians.training_setup(opt)
     if checkpoint:
@@ -178,34 +163,12 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         mask_json_path = os.path.join(masks_path, "masks.json")
         label_maps = load_label_maps_from_json(mask_json_path)
     
-    if args.video_segment:
-        predictor = build_sam2_video_predictor(args.sam2_cfg, args.sam2_ckpt)
-        source_path = args.source_path
-        images_dir = os.path.join(source_path, "images")
-        frame_names = [
-            p for p in os.listdir(images_dir)
-            if os.path.splitext(p)[-1] in [".jpg", ".jpeg", ".JPG", ".JPEG"]
-        ]
-        train_list_path = os.path.join(source_path, "train_list.txt")
-        with open(train_list_path, 'r') as f:
-            train_list = set([os.path.splitext(name)[0] for name in f.read().splitlines()])
-        frame_names = [p for p in frame_names if os.path.splitext(p)[0] in train_list]
-        frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
-        print("frame_names:", frame_names)
-        inference_state = predictor.init_state(video_path=images_dir)
-        predictor.reset_state(inference_state)
-        video_seg_point_dict = {}
-        ann_obj_id_dict = {}
-        video_seg_mask = {}
-
     for iteration in range(first_iter, opt.iterations + 1):        
 
         iter_start.record()
 
         gaussians.update_learning_rate(iteration)
 
-        if args.optim_pose==False:
-            gaussians.P.requires_grad_(False)
         if iteration % 1000 == 0:
             gaussians.oneupSHdegree()
 
@@ -214,8 +177,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
         pose = gaussians.get_RT(viewpoint_cam.uid)
 
-        camera_position = viewpoint_cam.T   
-        gaussians.compute_normal(camera_position)
 
         # Render
         if (iteration - 1) == debug_from:
@@ -245,87 +206,11 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         if args.use_masks and label_map_for_image is not None:
             label_map_for_image = torch.tensor(label_map_for_image).cuda()
-            instance_threshold = args.instance_threshold
+            instance_threshold = args.preset_instance_threshold
             image_name = viewpoint_cam.image_name
             heatmap_norm, heatmap_binary = compute_instance_losses(combined_loss, label_map_for_image, instance_threshold, iteration, image_name, args)
-            if iteration > (args.video_seg_start_iter - 1) and iteration % args.video_seg_interval == 0:
-                predictor.reset_state(inference_state)
-                video_seg_points  = get_points_from_heatmap(heatmap_norm, iteration, args.preset_video_seg_threshold)
-
-                save_dir = os.path.join(args.model_path, "video_seg")
-                if not os.path.exists(save_dir):
-                    os.makedirs(save_dir)
-                save_path = os.path.join(save_dir, f"heatmap_with_points_{iteration}.png")
-                image_name = viewpoint_cam.image_name + ".jpg"
-                if image_name in frame_names:
-                    current_frame_idx = frame_names.index(image_name)
-                else:
-                    raise ValueError(f"Image name '{image_name}' not found in frame names.")
-
-                if current_frame_idx not in video_seg_point_dict:
-                    video_seg_point_dict[current_frame_idx] = []
-                    ann_obj_id_dict[current_frame_idx] = []
-                
-                ann_id_counter = ann_obj_id_dict[current_frame_idx][-1] + 1 if ann_obj_id_dict[current_frame_idx] else 0  # 获取最后一个ann_id
-
-                for point in video_seg_points:
-                    point_list = list(point)
-                    if point_list not in video_seg_point_dict[current_frame_idx]:
-                        video_seg_point_dict[current_frame_idx].append(point_list)
-                        ann_obj_id_dict[current_frame_idx].append(ann_id_counter)
-                        ann_id_counter += 1 
-
-                print("video_seg_point_dict:", video_seg_point_dict)
-                print("ann_obj_id_dict:", ann_obj_id_dict)
-
-                for id, point in enumerate(video_seg_points):
-                    points = np.array([[int(point[0]), int(point[1])]], dtype=np.int32)  
-                    labels = np.array([1], dtype=np.int32) 
-                    point_list = list(point)
-                    ann_obj_id = ann_obj_id_dict[current_frame_idx][video_seg_point_dict[current_frame_idx].index(point_list)]
-                    predictor.add_new_points(
-                        inference_state=inference_state,
-                        frame_idx=current_frame_idx,
-                        obj_id=ann_obj_id,
-                        points=points,
-                        labels=labels,
-                    )
-                video_segments = {} 
-                for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state):
-                    video_segments[out_frame_idx] = {
-                        out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
-                        for i, out_obj_id in enumerate(out_obj_ids)
-                    }
-                for out_frame_idx in tqdm(range(current_frame_idx, len(frame_names), 1)):
-                    frame_path = os.path.join(images_dir, frame_names[out_frame_idx])
-                    image_seg = Image.open(frame_path)
-                    image_seg_width, image_seg_height = image_seg.size
-                    fig = plt.figure(figsize=(image_seg_width  / 100, image_seg_height / 100), dpi=100)
-                    ax = fig.add_subplot(111)
-                    plt.imshow(np.zeros((image_seg_height, image_seg_width , 3)))
-                    ax.imshow(image_seg)
-
-
-                    if out_frame_idx not in video_seg_mask:
-                        video_seg_mask[out_frame_idx] = np.ones((image_seg_height, image_seg_width), dtype=np.uint8)
-
-                    for out_obj_id, out_mask in video_segments[out_frame_idx].items():
-                        show_mask(out_mask, ax, obj_id=out_obj_id)
-                        out_mask = ~out_mask 
-                        binary_mask = out_mask.astype(np.uint8)
-                        video_seg_mask[out_frame_idx] = np.bitwise_and(video_seg_mask[out_frame_idx], binary_mask)
 
         if args.use_masks and iteration > args.mask_start_iter:
-            if args.video_segment and iteration > args.video_seg_start_iter:
-                image_name = viewpoint_cam.image_name + ".jpg"
-                frame_idx = frame_names.index(image_name)
-                if frame_idx in video_seg_mask:
-                    video_mask = torch.tensor(video_seg_mask[frame_idx]).cuda().squeeze()
-                else:
-                    video_mask = torch.ones_like(heatmap_binary)
-
-                loss = (1.0 - opt.lambda_dssim) * (Ll1 * video_mask * heatmap_binary).mean() + opt.lambda_dssim * (ssim_value * video_mask * heatmap_binary).mean()
-            else:
                 loss = (1.0 - opt.lambda_dssim) * (Ll1 * heatmap_binary).mean() + opt.lambda_dssim * (ssim_value * heatmap_binary).mean()
         else:
             loss = (1.0 - opt.lambda_dssim) * Ll1.mean() + opt.lambda_dssim * ssim_value.mean()
@@ -434,12 +319,6 @@ if __name__ == "__main__":
     parser.add_argument("--threshold_local", type=float, default=0.4)
     parser.add_argument("--use_masks", action="store_true")
     parser.add_argument("--mask_start_iter", type=int, default=500)
-    parser.add_argument("--video_seg_start_iter", type=int, default=500)
-    parser.add_argument("--video_seg_interval", type=int, default=100)
-    parser.add_argument("--use_hooks", action="store_true")
-    parser.add_argument("--video_segment", action="store_true")
-    parser.add_argument("--preset_video_seg_threshold", type=float, default=1.8)
-    parser.add_argument("--threshold_global", type=float, default=2.8)
     parser.add_argument("--sam2_ckpt", type=str, default="checkpoints/sam2_hiera_large.pt")
     parser.add_argument("--sam2_cfg", type=str, default="sam2_hiera_l.yaml")
     parser.add_argument("--schedule_densify_grad_threshold", action="store_true")

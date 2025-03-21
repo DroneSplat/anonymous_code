@@ -482,36 +482,3 @@ class GaussianModel:
     def add_densification_stats(self, viewspace_point_tensor, update_filter):
         self.xyz_gradient_accum[update_filter] += torch.norm(viewspace_point_tensor.grad[update_filter,:2], dim=-1, keepdim=True)
         self.denom[update_filter] += 1
-
-    def compute_normal(self, camera_position):
-        camera_position = torch.tensor(camera_position, dtype=torch.float32).to(self.get_xyz.device)
-        vectors = self.get_xyz - camera_position  
-        self._normal = torch.nn.functional.normalize(vectors, dim=-1)
-
-    def scale_gradient_hook(self, grad_scale):
-        voxel_centers = self._voxel[:, :3]  
-        gaussian_positions = self._xyz
-        voxel_sizes = self._voxel[:, 3:].max(dim=1).values  
-
-        distances = torch.norm(gaussian_positions - voxel_centers, dim=1)
-        
-        decay_factor = torch.where(distances > 3.5 * voxel_sizes, 
-                                torch.exp(-(distances - 3.5 * voxel_sizes) / voxel_sizes), 
-                                torch.ones_like(distances))
-        adjusted_grad = grad_scale * decay_factor.unsqueeze(1) 
-
-        return adjusted_grad
-
-    def xyz_gradient_hook(self, grad_xyz):
-        voxel_centers = self._voxel[:, :3] 
-        gaussian_positions = self._xyz
-        voxel_sizes = self._voxel[:, 3:].max(dim=1).values  
-
-        distances = torch.norm(gaussian_positions - voxel_centers, dim=1)
-        
-        decay_factor = torch.where(distances > 3.5 * voxel_sizes, 
-                                torch.exp(-(distances - 3.5 * voxel_sizes) / voxel_sizes), 
-                                torch.ones_like(distances))
-        adjusted_grad = grad_xyz * decay_factor.unsqueeze(1) 
-
-        return adjusted_grad
